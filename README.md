@@ -36,15 +36,15 @@ La liste (non exhaustive) suivante comporte des éléments d'évaluation du proj
     6. [Configuration de VSCode pour le développement Python dans WSL](#config-vs)
     7. [Export de votre machine virtuelle](#export-wsl)
     8. [Réutilisation d'une machine virtuelle](#reuse-wsl)
-3. [Mise en place du serveur CI](#jenkins)
+3. [Appropriation du projet](#projet)
+    1. [Description de PowerGrid](#projet-desc)
+    2. [Architecture du projet](#projet-arch)
+    4. [Étapes de développement du projet](#projet-pem)
+4. [Mise en place du serveur CI](#jenkins)
     1. [Configuration d'un environnement WSL](#jenkins-wsl)
     2. [Autorisation de Jenkins dans GitHub](#jenkins-github)
     3. [Accès au tableau de bord Jenkins](#jenkins-dashboard)
     4. [Configuration de la pipeline Jenkins](#jenkins-pipeline)
-4. [Appropriation du projet](#projet)
-    1. [Description de PowerGrid](#projet-desc)
-    2. [Architecture du projet](#projet-arch)
-    4. [Étapes de développement du projet](#projet-pem)
 
 ----
 
@@ -305,6 +305,148 @@ code .
 
 > Note : Si VSCode ne semble pas connecté à la machine virtuelle au lancement, vérifier que l'extension WSL est bien installée dans le navigateur d'extensions, et installez-là au besoin.
 
+<a name="projet" />
+ 
+## Appropriation du projet
+
+Vous êtes désormais en charge du développement du projet PowerGrid, vous devez organiser votre groupe afin de remplir les différents objectifs définis lors de la spécification.
+
+Pour commencer, chacun des membres du groupe peut se connecter à son environnement de travail en suivant les instructions décrites dans la [section correspondante](#reuse-wsl).
+
+Dans l'environnement VSCode, l'invite de commande située en bas de l'interface permettra d'entrer les commandes `git` pour la gestion des versions. Quand l'un des membres du groupe aura modifié le code du projet et souhaitera le valider, il créera une nouvelle validation (*commit*), et la poussera (*push*) vers le serveur github (*origin*). Alternativement, les boutons de l'interface de VSCode permettent de réaliser les mêmes opérations de manière plus conviviale.
+
+Il vous est recommandé de créer chacun une branche (`git branch`) à votre nom, sur laquelle vous réaliserez vos commits et que vous pourrez pousser vers le dépôt GitHub.
+
+<a name="projet-desc" />
+
+### Description de PowerGrid
+
+**PowerGrid** est un outil d'optimisation d'un réseau de distribution électrique. À partir d'un terrain donné en entrée, PowerGrid doit trouver une configuration de lignes électriques permettant d'alimenter tous les clients renseignés.
+
+Les terrains sont des tableaux rectangulaires décrivant une zone, ainsi que des clients et des obstacles répartis sur celle-ci. La figure ci-dessous représente un terrain tel qu'il est possible d'en traiter en utilisant **PowerGrid** :
+
+<p align="center">
+  <img src="figures/terrain.png" alt="Exemple de représentation de terrain"/>
+</p>
+
+L'objectif de **PowerGrid** est de configurer un réseau électrique reliant chacun des clients (cases bleues) sur le terrain à la case d'entrée électrique (case verte) de celui-ci. Des pénalités peuvent être appliquées au réseau si celui-ci passe par des obstacles (cases rouges).
+
+Un réseau électrique est composé d'un ensemble de noeuds reliés par des arcs. Deux noeuds reliés doivent occuper des cases voisines du terrain (en ligne ou en colonne). Voici un exemple de réseau pouvant couvrir le terrain et assurer la distribution aux clients :
+
+<p align="center">
+  <img src="figures/reseau-ex.png" alt="Exemple de réseau recouvrant un terrain"/>
+</p>
+
+**PowerGrid** est un programme Python qui inclut les fonctionnalités de gestion de différents terrains, ainsi que de configuration de réseaux électriques permettant de les couvrir.
+
+<a name="projet-arch" />
+
+### Architecture du projet
+
+Le code Python du projet PowerGrid est découpé en plusieurs classes, qui sont décrites dans cette section. Dans l'état actuel des choses, certaines classes sont incomplètes, et il manque bon nombre de tests.
+
+Vous pouvez néanmoins exécuter le script principal `PowerGrid.py` depuis votre environnement virtuel de développement Python, ou lancer les tests existants en exécutant la commande :
+
+```bash
+python -m unittest -v
+```
+
+Le projet est initialement constitué de plusieurs classes qui interagissent entre elles. Vous pouvez commencer à explorer les fichiers du dépôt pour comprendre leurs rôles.
+
+#### Script `PowerGrid.py`
+
+Ce script contient une démonstration des fonctionnalités de **PowerGrid**. Il charge un fichier présent sur le dépôt contenant la description d'un terrain, affiche ce terrain dans le terminal, puis crée un nouvel objet de type `Reseau`. Cet objet doit représenter une configuration d'un réseau de distribution électrique. Le script demande la génération d'une distribution à partir du `Terrain` chargé, et demande au `Reseau` de valider la configuration ainsi générée.
+
+Le script assigne ensuite une méthode manuelle de configuration au `Reseau`, et demande à nouveau la génération d'une nouvelle configuration. Enfin, le script demande la vérification du nouveau réseau généré.
+
+#### Classe `Terrain`
+
+La classe est accessible dans le fichier `Terrain.py`. Elle doit contenir les informations sur un la topologie d'un terrain, l'emplacement des clients à fournir, de l'entrée et des obstacles. Elle est pour cela munie d'une liste de variables issues de l'énumération `Case` définie dans le même fichier. Une fonction `charger` permet de lire un fichier passé en paramètre, et de peupler un `Terrain` avec ces informations. Plusieurs méthodes définies dans le fichier permettent de faciliter son utilisation.
+
+Un réseau valide généré par PowerGrid devra relier chacun des clients à l'entrée électrique, en passant le moins possible par des obstacles du terrain. 
+
+#### Classe `Reseau`
+
+Elle est définie dans le fichier `Reseau.py`. Cette classe doit permettre de représenter une configuration d'un réseau de distribution. Elle comporte plusieurs attributs :
+
+- `strat` contient la stratégie actuelle pour la configuration du réseau à partir d'un `Terrain` (stratégies de configuration expliquées ci-dessous)
+- `noeuds` est un dictionnaire dont les clés sont des entiers positifs correspondants aux identifiants des noeuds du réseau (les cases du terrain sur lesquelles passe le réseau), et dont les valeurs sont des tuples de deux entiers correspondants aux coordonnées des noeuds du réseau sur le `Terrain` correspondant.
+- `arcs` est une liste de tuples de deux entiers. Ces tuples représentent des liaisons entre deux noeuds du réseau (deux noeuds du réseau peuvent avoir des coordonnées voisines, sans être reliés par un arc).
+- `noeud_entree` est un entier correspondant au noeud du réseau placé sur l'entrée électrique du terrain. Par défaut, cet attribut prend la valeur `-1`.
+
+La figure ci-dessous représente un réseau superposé au terrain sur lequel il doit être déployé, avec les valeurs correspondantes des attributs de la classe `Reseau` :
+
+<p align="center">
+  <img src="figures/reseau.png" alt="Exemple de représentation de réseau et des attributs correspondants."/>
+</p>
+
+Les méthodes de la classe `Reseau` permettent son utilisation pour la création d'une configuration adaptée à un `Terrain` :
+- `definir_entree` permet de désigner le noeud du reseau qui correspond à l'entrée électrique du terrain.
+- `ajouter_noeud` permet d'ajouter un noeud au réseau. La fonction doit vérifier que la clé du nouveau noeud est bien un entier positif, et qu'un noeud avec la même clé n'existe pas déjà.
+- `ajouter_arc` permet d'ajouter un nouvel arc entre deux noeuds existants. La méthode prend les clés des deux noeuds à relier en paramètre, et doit vérifier que ces noeuds existes bien dans le réseau et ne sont pas déjà reliés.
+- `set_strategie` reçoit un objet de type `StrategieReseau` qui devient la nouvelle stratégie de configuration du réseau.
+- `valider_reseau` est la méthode qui vérifie que la configuration actuelle du réseau est correcte. Un réseau n'est pas valide si chacun de ses noeuds n'est pas relié au noeud d'entrée.
+- `valider_distribution` permet, en utilisant un terrain, de vérifier si la configuration actuelle du réseau permet bien de distribuer de l'électricité à chacun des clients du terrain.
+- `configurer` est la méthode qui fait appel à la stratégie du réseau pour trouver une nouvelle configuration.
+- `afficher` permet d'afficher la configuration du réseau dans le terminal.
+- `afficher_avec_terrain` permet d'afficher à la fois la configuration actuelle du réseau et le terrain auquel elle est censée être adaptée.
+- `calculer_cout` permet de calculer le coût total du réseau. Dans ce TP, nous considérons qu'une case d'un terrain représente 1 kilomètre carré. Nous considérons qu'un kilomètre de ligne (un arc du réseau) coûte 1.5 million d'€. De plus, l'aménagement d'un noeud sur un obstacle coût 2M€, et sur toute autre case uniquement 1M€.
+
+#### Fichier `StrategieReseau.py`
+
+Ce fichier contient les différentes stratégie de configuration d'un réseau électrique à partir d'un `Terrain`.
+
+La classe `StrategieReseau` sert de classe abstraite définissant l'interface d'utilisation d'une stratégie. La méthode `configurer` prend un terrain comme unique paramètre, et retourne des valeurs qui remplaceront les attributs du réseau : un entier correspondant à l'attribut `noeud_entree`, un dictionnaire qui devra être utilisé comme l'attribut `noeuds`, et une liste qui remplacera l'attribut `arcs` de la classe `Reseau`. Les classes dérivant de la classe `StrategieReseau` doivent réimplémenter cette méthode.
+
+La classe `StrategieReseauAutomatique` doit déterminer une configuration pour un réseau automatiquement à partir d'un `Terrain`.
+
+La classe `StrategieReseauManuelle` doit implémenter un processus et un affichage permettant de demander à l'utilisateur du programme de choisir lui-même la configuration de son réseau.
+
+#### Fichiers tests
+
+Les fichiers Python contenus dans le répertoire `test` contiennent les tests unitaires du projet. L'objectif est d'écrire des tests pour la majeure partie des fonctions implémentées dans le programme.
+
+<a name="projet-pem" />
+
+### Étapes de développement du projet
+
+#### État des lieux
+
+L'exécution des tests avec le module `unittest` montre que la plupart des tests échoue à l'heure actuelle. Certains tests réussissent même uniquement par chance. En suivant la trace des tests qui échouent, vous pouvez remonter à toutes les fonctions ou tests qui ne sont pas encore implémentés pour l'instant. En voici une liste :
+- `Reseau.valider_reseau` : implémentation de la fonction permettant de valider la configuration d'un réseau
+- `Reseau.valider_distribution` : implémentation de la fonction permettant de vérifier qu'un réseau couvre bien tous les clients d'un terrain
+- `Reseau.afficher` : implémentation de la fonction d'affichage d'un réseau dans le terminal
+- `StrategieReseauManuelle.configurer` : implémentation de la fonction qui gère la configuration manuelle d'un réseau à partir d'un terrain. L'utilisateur doit avoir l'occasion d'entrer les informations de la nouvelle configuration. Vous pouvez, par exemple, implémenter une fonction qui, dans une boucle, affiche le réseau et le terrain puis demande à l'utilisateur d'ajouter un noeud à un endroit du terrain. L'utilisateur devrait alors spécifier quels liaisons seront générées entre ce nouveau noeud et les noeuds voisins existants.
+- `StrategieReseauAuto.configurer` : implémentation de la fonction qui génère automatiquement une configuration du réseau pour couvrir un terrain donné en paramètres. Dans un premier temps, pensez à des configurations très simples : 1) un réseau couvrant tout le terrain ? 2) un réseau qui couvre toutes les lignes contenant des clients, sans prendre en compte les obstacles ? Dans un second temps, vous pourrez envisager des algorithmes permettant d'optimiser le tracé du réseau.
+- `TestReseau.test_definition_entree` : test de la méthode d'assignation de l'identifiant du noeud d'entrée du réseau. Il s'agit de vérifier que la modification de l'attribut correspondant de `Reseau` est bien cohérente avec l'appel à la méthode.
+- `TestReseau.test_ajout_noeud` : test de la méthode d'ajout d'un nouveau noeud
+- `TestReseau.test_ajout_arc` : test de la méthode d'ajout d'un nouvel arc
+- `TestTerrain.test_chargement` : test du chargement d'un fichier contenant la description d'un terrain
+
+L'intégralité de ces méthodes doit être implémenté de manière à ce que le programme soit fonctionnel.
+
+#### Répartition des tâches
+
+Vous formez des groupes de deux à trois étudiants, ayant chacun à disposition un poste de travail configuré pour le développement de ce projet. La plupart des tâches énumérées ci-dessus sont réalisables en parallèle. Vous pouvez chacun choisir une tâche, créer une nouvelle branche de travail sur votre dépôt Git local, et avancer de votre côté.
+
+Essayez d'évaluer la difficulté des tâches, et de les répartir en fonction de vos compétences respectives au sein du groupe. Par exemple, l'implémentation des tests manquants devrait être une tâche assez simple, tandis que l'implémentation de la méthode `StrategieReseauAuto.configurer` demande une certaine réflexion algorithmique.
+
+**Veillez à bien comprendre le fonctionnement du code existant avant de procéder à des développements. Lisez attentivement le code, exécutez-le, possiblement par morceaux, afin de le maîtriser et de pouvoir implémenter les mécanismes manquants.**
+
+Une fois que la tâche choisie est réalisée, vous devez réaliser une fusion de votre branche avec la branche principale, avant de pousser vos modifications vers le dépôt en ligne sur GitHub. Avant cela, veillez à vous assurer que les modifications que vous avez apportées permettent bien de passer les tests concernés.
+
+#### Pour aller plus loin
+
+Une fois que les fonctionnalités énoncées plus haut ont été ajoutées, il vous reste à trouver des pistes d'amélioration du projet **PowerGrid**. Voici quelques pistes :
+- Réfléchir à une méthode d'affichage graphique du résultat, préférable à l'affichage sous forme de caractères ASCII dans un terminal (on peut par exemple penser à la génération d'un fichier html, ou à la création d'une image à l'aide de `numpy` et d'`opencv-python`).
+- Réfléchir à différentes implémentations d'algorithmes de configuration automatique du réseau (par exemple, un algorithme cherchant à minimiser les distances de chaque client à l'entrée, un algorithme cherchant à minimiser le coût total du réseau...).
+
+Des améliorations peuvent également être apportées au processus d'intégration continue :
+- Intégration de rapports sur la qualité du code issues d'un analyseur de syntaxe comme **PyLint**.
+- Configuration du serveur pour exécuter le Pipeline lors de nouvelles modifications sur la branche principale.
+
+Toutes les traces de recherches personnelles sur de telles améliorations du projet seront valorisées dans votre rapport.
+
 <a name="jenkins" />
 
 ## Mise en place du serveur CI
@@ -516,146 +658,4 @@ Validez cette fenêtre, vous revenez alors à l'interface de configuration de la
 Les champs restants concernent des réglages supplémentaires pour le Pipeline, notamment la branche du dépôt sur laquelle l'appliquer. Vous pouvez conserver les réglages par défaut et valider la création de votre Pipeline en bas de la fenêtre.
 
 De retour à votre tableau de bord, cherchez à lancer un build de votre Pipeline pour vérifier son bon fonctionnement. Explorez ensuite l'interface pour vérifier le résultat des tests.
-
-<a name="projet" />
- 
-## Appropriation du projet
-
-Vous êtes désormais en charge du développement du projet PowerGrid, vous devez organiser votre groupe afin de remplir les différents objectifs définis lors de la spécification.
-
-Pour commencer, chacun des membres du groupe peut se connecter à con environnement de travail en suivant les instructions décrites dans la [section correspondante](#reuse-wsl).
-
-Dans l'environnement VSCode, l'invite de commande située en bas de l'interface permettra d'entrer les commandes `git` pour la gestion des versions. Quand l'un des membres du groupe aura modifié le code du projet et souhaitera le valider, il créera une nouvelle validation (*commit*), et la poussera (*push*) vers le serveur github (*origin*). Alternativement, les boutons de l'interface de VSCode permettent de réaliser les mêmes opérations de manière plus conviviale.
-
-Il vous est recommandé de créer chacun une branche (`git branch`) à votre nom, sur laquelle vous réaliserez vos commits et que vous pourrez pousser vers le dépôt GitHub.
-
-<a name="projet-desc" />
-
-### Description de PowerGrid
-
-**PowerGrid** est un outil d'optimisation d'un réseau de distribution électrique. À partir d'un terrain donné en entrée, PowerGrid doit trouver une configuration de lignes électriques permettant d'alimenter tous les clients renseignés.
-
-Les terrains sont des tableaux rectangulaires décrivant une zone, ainsi que des clients et des obstacles répartis sur celle-ci. La figure ci-dessous représente un terrain tel qu'il est possible d'en traiter en utilisant **PowerGrid** :
-
-<p align="center">
-  <img src="figures/terrain.png" alt="Exemple de représentation de terrain"/>
-</p>
-
-L'objectif de **PowerGrid** est de configurer un réseau électrique reliant chacun des clients (cases bleues) sur le terrain à la case d'entrée électrique (case verte) de celui-ci. Des pénalités peuvent être appliquées au réseau si celui-ci passe par des obstacles (cases rouges).
-
-Un réseau électrique est composé d'un ensemble de noeuds reliés par des arcs. Deux noeuds reliés doivent occuper des cases voisines du terrain (en ligne ou en colonne). Voici un exemple de réseau pouvant couvrir le terrain et assurer la distribution aux clients :
-
-<p align="center">
-  <img src="figures/reseau-ex.png" alt="Exemple de réseau recouvrant un terrain"/>
-</p>
-
-**PowerGrid** est un programme Python qui inclut les fonctionnalités de gestion de différents terrains, ainsi que de configuration de réseaux électriques permettant de les couvrir.
-
-<a name="projet-arch" />
-
-### Architecture du projet
-
-Le code Python du projet PowerGrid est découpé en plusieurs classes, qui sont décrites dans cette section. Dans l'état actuel des choses, certaines classes sont incomplètes, et il manque bon nombre de tests.
-
-Vous pouvez néanmoins exécuter le script principal `PowerGrid.py` depuis votre environnement virtuel de développement Python, ou lancer les tests existants en exécutant la commande :
-
-```bash
-python -m unittest -v
-```
-
-Le projet est initialement constitué de plusieurs classes qui interagissent entre elles. Vous pouvez commencer à explorer les fichiers du dépôt pour comprendre leurs rôles.
-
-#### Script `PowerGrid.py`
-
-Ce script contient une démonstration des fonctionnalités de **PowerGrid**. Il charge un fichier présent sur le dépôt contenant la description d'un terrain, affiche ce terrain dans le terminal, puis crée un nouvel objet de type `Reseau`. Cet objet doit représenter une configuration d'un réseau de distribution électrique. Le script demande la génération d'une distribution à partir du `Terrain` chargé, et demande au `Reseau` de valider la configuration ainsi générée.
-
-Le script assigne ensuite une méthode manuelle de configuration au `Reseau`, et demande à nouveau la génération d'une nouvelle configuration. Enfin, le script demande la vérification du nouveau réseau généré.
-
-#### Classe `Terrain`
-
-La classe est accessible dans le fichier `Terrain.py`. Elle doit contenir les informations sur un la topologie d'un terrain, l'emplacement des clients à fournir, de l'entrée et des obstacles. Elle est pour cela munie d'une liste de variables issues de l'énumération `Case` définie dans le même fichier. Une fonction `charger` permet de lire un fichier passé en paramètre, et de peupler un `Terrain` avec ces informations. Plusieurs méthodes définies dans le fichier permettent de faciliter son utilisation.
-
-Un réseau valide généré par PowerGrid devra relier chacun des clients à l'entrée électrique, en passant le moins possible par des obstacles du terrain. 
-
-#### Classe `Reseau`
-
-Elle est définie dans le fichier `Reseau.py`. Cette classe doit permettre de représenter une configuration d'un réseau de distribution. Elle comporte plusieurs attributs :
-
-- `strat` contient la stratégie actuelle pour la configuration du réseau à partir d'un `Terrain` (stratégies de configuration expliquées ci-dessous)
-- `noeuds` est un dictionnaire dont les clés sont des entiers positifs correspondants aux identifiants des noeuds du réseau (les cases du terrain sur lesquelles passe le réseau), et dont les valeurs sont des tuples de deux entiers correspondants aux coordonnées des noeuds du réseau sur le `Terrain` correspondant.
-- `arcs` est une liste de tuples de deux entiers. Ces tuples représentent des liaisons entre deux noeuds du réseau (deux noeuds du réseau peuvent avoir des coordonnées voisines, sans être reliés par un arc).
-- `noeud_entree` est un entier correspondant au noeud du réseau placé sur l'entrée électrique du terrain. Par défaut, cet attribut prend la valeur `-1`.
-
-La figure ci-dessous représente un réseau superposé au terrain sur lequel il doit être déployé, avec les valeurs correspondantes des attributs de la classe `Reseau` :
-
-<p align="center">
-  <img src="figures/reseau.png" alt="Exemple de représentation de réseau et des attributs correspondants."/>
-</p>
-
-Les méthodes de la classe `Reseau` permettent son utilisation pour la création d'une configuration adaptée à un `Terrain` :
-- `definir_entree` permet de désigner le noeud du reseau qui correspond à l'entrée électrique du terrain.
-- `ajouter_noeud` permet d'ajouter un noeud au réseau. La fonction doit vérifier que la clé du nouveau noeud est bien un entier positif, et qu'un noeud avec la même clé n'existe pas déjà.
-- `ajouter_arc` permet d'ajouter un nouvel arc entre deux noeuds existants. La méthode prend les clés des deux noeuds à relier en paramètre, et doit vérifier que ces noeuds existes bien dans le réseau et ne sont pas déjà reliés.
-- `set_strategie` reçoit un objet de type `StrategieReseau` qui devient la nouvelle stratégie de configuration du réseau.
-- `valider_reseau` est la méthode qui vérifie que la configuration actuelle du réseau est correcte. Un réseau n'est pas valide si chacun de ses noeuds n'est pas relié au noeud d'entrée.
-- `valider_distribution` permet, en utilisant un terrain, de vérifier si la configuration actuelle du réseau permet bien de distribuer de l'électricité à chacun des clients du terrain.
-- `configurer` est la méthode qui fait appel à la stratégie du réseau pour trouver une nouvelle configuration.
-- `afficher` permet d'afficher la configuration du réseau dans le terminal.
-- `afficher_avec_terrain` permet d'afficher à la fois la configuration actuelle du réseau et le terrain auquel elle est censée être adaptée.
-- `calculer_cout` permet de calculer le coût total du réseau. Dans ce TP, nous considérons qu'une case d'un terrain représente 1 kilomètre carré. Nous considérons qu'un kilomètre de ligne (un arc du réseau) coûte 1.5 million d'€. De plus, l'aménagement d'un noeud sur un obstacle coût 2M€, et sur toute autre case uniquement 1M€.
-
-#### Fichier `StrategieReseau.py`
-
-Ce fichier contient les différentes stratégie de configuration d'un réseau électrique à partir d'un `Terrain`.
-
-La classe `StrategieReseau` sert de classe abstraite définissant l'interface d'utilisation d'une stratégie. La méthode `configurer` prend un terrain comme unique paramètre, et retourne des valeurs qui remplaceront les attributs du réseau : un entier correspondant à l'attribut `noeud_entree`, un dictionnaire qui devra être utilisé comme l'attribut `noeuds`, et une liste qui remplacera l'attribut `arcs` de la classe `Reseau`. Les classes dérivant de la classe `StrategieReseau` doivent réimplémenter cette méthode.
-
-La classe `StrategieReseauAutomatique` doit déterminer une configuration pour un réseau automatiquement à partir d'un `Terrain`.
-
-La classe `StrategieReseauManuelle` doit implémenter un processus et un affichage permettant de demander à l'utilisateur du programme de choisir lui-même la configuration de son réseau.
-
-#### Fichiers tests
-
-Les fichiers Python contenus dans le répertoire `test` contiennent les tests unitaires du projet. L'objectif est d'écrire des tests pour la majeure partie des fonctions implémentées dans le programme.
-
-<a name="projet-pem" />
-
-### Étapes de développement du projet
-
-#### État des lieux
-
-L'exécution des tests avec le module `unittest` montre que la plupart des tests échoue à l'heure actuelle. Certains tests réussissent même uniquement par chance. En suivant la trace des tests qui échouent, vous pouvez remonter à toutes les fonctions ou tests qui ne sont pas encore implémentés pour l'instant. En voici une liste :
-- `Reseau.valider_reseau` : implémentation de la fonction permettant de valider la configuration d'un réseau
-- `Reseau.valider_distribution` : implémentation de la fonction permettant de vérifier qu'un réseau couvre bien tous les clients d'un terrain
-- `Reseau.afficher` : implémentation de la fonction d'affichage d'un réseau dans le terminal
-- `StrategieReseauManuelle.configurer` : implémentation de la fonction qui gère la configuration manuelle d'un réseau à partir d'un terrain. L'utilisateur doit avoir l'occasion d'entrer les informations de la nouvelle configuration. Vous pouvez, par exemple, implémenter une fonction qui, dans une boucle, affiche le réseau et le terrain puis demande à l'utilisateur d'ajouter un noeud à un endroit du terrain. L'utilisateur devrait alors spécifier quels liaisons seront générées entre ce nouveau noeud et les noeuds voisins existants.
-- `StrategieReseauAuto.configurer` : implémentation de la fonction qui génère automatiquement une configuration du réseau pour couvrir un terrain donné en paramètres. Dans un premier temps, pensez à des configurations très simples : 1) un réseau couvrant tout le terrain ? 2) un réseau qui couvre toutes les lignes contenant des clients, sans prendre en compte les obstacles ? Dans un second temps, vous pourrez envisager des algorithmes permettant d'optimiser le tracé du réseau.
-- `TestReseau.test_definition_entree` : test de la méthode d'assignation de l'identifiant du noeud d'entrée du réseau. Il s'agit de vérifier que la modification de l'attribut correspondant de `Reseau` est bien cohérente avec l'appel à la méthode.
-- `TestReseau.test_ajout_noeud` : test de la méthode d'ajout d'un nouveau noeud
-- `TestReseau.test_ajout_arc` : test de la méthode d'ajout d'un nouvel arc
-- `TestTerrain.test_chargement` : test du chargement d'un fichier contenant la description d'un terrain
-
-L'intégralité de ces méthodes doit être implémenté de manière à ce que le programme soit fonctionnel.
-
-#### Répartition des tâches
-
-Vous formez des groupes de deux à trois étudiants, ayant chacun à disposition un poste de travail configuré pour le développement de ce projet. La plupart des tâches énumérées ci-dessus sont réalisables en parallèle. Vous pouvez chacun choisir une tâche, créer une nouvelle branche de travail sur votre dépôt Git local, et avancer de votre côté.
-
-Essayez d'évaluer la difficulté des tâches, et de les répartir en fonction de vos compétences respectives au sein du groupe. Par exemple, l'implémentation des tests manquants devrait être une tâche assez simple, tandis que l'implémentation de la méthode `StrategieReseauAuto.configurer` demande une certaine réflexion algorithmique.
-
-**Veillez à bien comprendre le fonctionnement du code existant avant de procéder à des développements. Lisez attentivement le code, exécutez-le, possiblement par morceaux, afin de le maîtriser et de pouvoir implémenter les mécanismes manquants.**
-
-Une fois que la tâche choisie est réalisée, vous devez réaliser une fusion de votre branche avec la branche principale, avant de pousser vos modifications vers le dépôt en ligne sur GitHub. Avant cela, veillez à vous assurer que les modifications que vous avez apportées permettent bien de passer les tests concernés.
-
-#### Pour aller plus loin
-
-Une fois que les fonctionnalités énoncées plus haut ont été ajoutées, il vous reste à trouver des pistes d'amélioration du projet **PowerGrid**. Voici quelques pistes :
-- Réfléchir à une méthode d'affichage graphique du résultat, préférable à l'affichage sous forme de caractères ASCII dans un terminal (on peut par exemple penser à la génération d'un fichier html, ou à la création d'une image à l'aide de `numpy` et d'`opencv-python`).
-- Réfléchir à différentes implémentations d'algorithmes de configuration automatique du réseau (par exemple, un algorithme cherchant à minimiser les distances de chaque client à l'entrée, un algorithme cherchant à minimiser le coût total du réseau...).
-
-Des améliorations peuvent également être apportées au processus d'intégration continue :
-- Intégration de rapports sur la qualité du code issues d'un analyseur de syntaxe comme **PyLint**.
-- Configuration du serveur pour exécuter le Pipeline lors de nouvelles modifications sur la branche principale.
-
-Toutes les traces de recherches personnelles sur de telles améliorations du projet seront valorisées dans votre rapport.
 
