@@ -39,6 +39,7 @@ La liste (non exhaustive) suivante comporte des éléments d'évaluation du proj
 3. [Appropriation du projet](#projet)
     1. [Description de PowerGrid](#projet-desc)
     2. [Architecture du projet](#projet-arch)
+    3. [Votre premier commit](#projet-premier-commit)
     4. [Étapes de développement du projet](#projet-pem)
 4. [Mise en place du serveur CI](#jenkins)
     1. [Configuration d'un environnement WSL](#jenkins-wsl)
@@ -406,13 +407,118 @@ La classe `StrategieReseauManuelle` doit implémenter un processus et un afficha
 
 Les fichiers Python contenus dans le répertoire `test` contiennent les tests unitaires du projet. L'objectif est d'écrire des tests pour la majeure partie des fonctions implémentées dans le programme.
 
+<a name="projet-premier-commit" />
+
+### Votre premier commit
+
+**L'un des membres** de l'équipe va réaliser un premier commit.
+Les autres membres du groupe peuvent assister à la résolution de cette partie, afin de savoir reproduire la manipulation de leur côté par la suite.
+
+Pour réaliser cet exemple, nous allons sélectionner une fonction manquante dans PowerGrid.
+Naviguez dans le fichier Terrain.py, jusqu'à la fonction `get_entree`.
+Cette fonction n'est pas encore implémentée.
+Pour l'instant, la fonction retourne toujours une valeur nulle (`Non`).
+
+```python
+def get_entree(self) -> tuple[int, int]:
+    # TODO
+    return None
+```
+
+Cette fonction est testée dans notre batterie de tests.
+Si vous naviguez jusqu'au fichier `test_terrain.py`, vous trouverez le test suivant:
+
+```python
+def test_get_entree(self):
+    t = Terrain()
+    t.cases = [
+            [Case.VIDE, Case.VIDE, Case.ENTREE],
+            [Case.CLIENT, Case.CLIENT, Case.CLIENT],
+    ]
+    entree = t.get_entree()
+    self.assertEqual(entree[0], 0)
+    self.assertEqual(entree[1], 2)
+```
+
+Veillez à comprendre le fonctionnement de ce test.
+Vous pouvez exécuter les tests de PowerGrid en exécutant la commande:
+
+```bash
+python -m unittest -v
+```
+
+Dans le récapitulatif, vérifiez que le test correspondant à la fonction `get_entree` échoue.
+
+La fonction `get_entree` doit retourner les coordonnées de la case d'entrée sur le terrain.
+Nous allons la mettre à jour, afin de parcourir les cases du terrain pour en trouver l'entrée:
+
+```python
+def get_entree(self) -> tuple[int, int]:
+    for i, l in enumerate(self.cases):
+        for j, c in enumerate(l):
+            if c == Case.ENTREE:
+                return (i, j)
+    return (-1, -1)
+```
+
+Exécutez à nouveau les tests, et vérifiez que la fonction retourne maintenant le bon résultat.
+
+Nous avons corrigé la fonction `get_entree`, et voulons maintenant partager cette correction avec les autres membres de l'équipe.
+Pour ce faire, il faut d'abord grouper nos modifications dans un nouveau commit.
+Cela peut être réalisé en utilisant deux commandes.
+Tout d'abord, ajoutez les modifications dans les validations avec `git add`:
+
+```bash
+git add Terrain.py
+```
+
+Créez ensuite le nouveau commit en utilisant la commande suivante:
+
+```bash
+git commit -m "Correction de la fonction get_entree"
+```
+
+Vous avez maintenant validé vos modifications dans un nouveau commit.
+Vérifiez que celui-ci se trouve dans votre historique des versions:
+
+```bash
+git log
+```
+
+Le nouveau commit n'est pour l'instant disponible que localement: les autres membres de l'équipe n'y ont pas accès.
+Afin de publier ce commit sur le serveur GitHub, vous allez devoir réaliser un `push` de votre branche active:
+
+```bash
+git push origin master
+```
+
+Cette commande a transféré votre nouveau commit vers le serveur GitHub.
+Vous devriez être en mesure de voir le changement apparaître sur l'interface du site.
+
+Enfin, il faut que les autres membres de l'équipe reçoivent les changements dans leur espace de travail.
+Pour télécharger les dernières modifications disponibles sur GitHub et les intégrer à votre espace de travail, vous pouvez utiliser la commande:
+
+```bash
+git pull origin master
+```
+
+Si aucun conflit n'existe entre le code local et celui qui est téléchargé sur GitHub, vous devriez voir apparaître le nouveau commit dans votre historique de version local.
+
+```bash
+git log
+```
+
+Les étapes précédentes décrivent le processus pour modifier le code de PowerGrid et partager vos modifications à votre équipe.
+Plusieurs fonctions sont incomplètes dans le code dont vous disposez au début de ce TP.
+Votre objectif est de vous répartir les tâches, afin de compléter toutes les fonctions manquantes du projet.
+
 <a name="projet-pem" />
 
 ### Étapes de développement du projet
 
 #### État des lieux
 
-L'exécution des tests avec le module `unittest` montre que la plupart des tests échoue à l'heure actuelle. Certains tests réussissent même uniquement par chance. En suivant la trace des tests qui échouent, vous pouvez remonter à toutes les fonctions ou tests qui ne sont pas encore implémentés pour l'instant. En voici une liste :
+L'exécution des tests avec le module `unittest` montre que la plupart des tests échoue à l'heure actuelle. Certains tests réussissent même uniquement par chance. En suivant la trace des tests qui échouent, vous pouvez remonter à toutes les fonctions ou tests qui ne sont pas encore implémentés pour l'instant. Ceux-ci sont marqués du tag `#TODO` dans le code. En voici une liste :
 - `Reseau.valider_reseau` : implémentation de la fonction permettant de valider la configuration d'un réseau
 - `Reseau.valider_distribution` : implémentation de la fonction permettant de vérifier qu'un réseau couvre bien tous les clients d'un terrain
 - `Reseau.afficher` : implémentation de la fonction d'affichage d'un réseau dans le terminal
@@ -427,13 +533,13 @@ L'intégralité de ces méthodes doit être implémenté de manière à ce que l
 
 #### Répartition des tâches
 
-Vous formez des groupes de deux à trois étudiants, ayant chacun à disposition un poste de travail configuré pour le développement de ce projet. La plupart des tâches énumérées ci-dessus sont réalisables en parallèle. Vous pouvez chacun choisir une tâche, créer une nouvelle branche de travail sur votre dépôt Git local, et avancer de votre côté.
+Vous formez des groupes de deux à trois étudiants, ayant chacun à disposition un poste de travail configuré pour le développement de ce projet. La plupart des tâches énumérées ci-dessus sont réalisables en parallèle. Vous pouvez chacun choisir une tâche, éditer le code correspondant sur votre dépôt Git local, lancer les tests correspondant et vérifier qu'ils passent, puis partager vos modifications avec votre équipe (comme décrit dans la [partie correspondante](#projet-premier-commit)).
+
+Au cours d'une séance, l'un des membres du groupe devra mettre en oeuvre un serveur d'intégration continue (voir [partie correspondante](#jenkins)). Il s'agit d'un travail indépendant, qui devra être documenté dans votre rapport final.
 
 Essayez d'évaluer la difficulté des tâches, et de les répartir en fonction de vos compétences respectives au sein du groupe. Par exemple, l'implémentation des tests manquants devrait être une tâche assez simple, tandis que l'implémentation de la méthode `StrategieReseauAuto.configurer` demande une certaine réflexion algorithmique.
 
 **Veillez à bien comprendre le fonctionnement du code existant avant de procéder à des développements. Lisez attentivement le code, exécutez-le, possiblement par morceaux, afin de le maîtriser et de pouvoir implémenter les mécanismes manquants.**
-
-Une fois que la tâche choisie est réalisée, vous devez réaliser une fusion de votre branche avec la branche principale, avant de pousser vos modifications vers le dépôt en ligne sur GitHub. Avant cela, veillez à vous assurer que les modifications que vous avez apportées permettent bien de passer les tests concernés.
 
 #### Pour aller plus loin
 
