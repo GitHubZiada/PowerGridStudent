@@ -34,12 +34,34 @@ class Reseau:
         self.strat = strat
 
     def valider_reseau(self) -> bool:
-        # TODO
-        return False
+        # L'entrée doit être un noeud existant
+        if self.noeud_entree not in self.noeuds:
+            return False
+        # Parcours du réseau à partir du noeud d'entrée
+        visites = {self.noeud_entree}
+        a_traiter = [self.noeud_entree]
+        while a_traiter:
+            n = a_traiter.pop()
+            for (n1, n2) in self.arcs:
+                if n1 == n and n2 not in visites:
+                    visites.add(n2)
+                    a_traiter.append(n2)
+                elif n2 == n and n1 not in visites:
+                    visites.add(n1)
+                    a_traiter.append(n1)
+        # Valide si tous les noeuds ont été atteints
+        return len(visites) == len(self.noeuds)
 
     def valider_distribution(self, t: Terrain) -> bool:
-        # TODO
-        return False
+        # Le réseau doit d'abord être connecté à l'entrée
+        if not self.valider_reseau():
+            return False
+        # Chaque client doit être couvert par un noeud du réseau
+        cases_couvertes = set(self.noeuds.values())
+        for client in t.get_clients():
+            if client not in cases_couvertes:
+                return False
+        return True
 
     def configurer(self, t: Terrain):
         self.noeud_entree, self.noeuds, self.arcs  = self.strat.configurer(t)
