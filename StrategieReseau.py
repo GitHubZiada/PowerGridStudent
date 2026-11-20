@@ -1,5 +1,5 @@
 from Terrain import Terrain, Case
-
+import heapq
 
 class StrategieReseau:
     def configurer(self, t: Terrain) -> tuple[int, dict[int, tuple[int, int]], list[tuple[int, int]]]:
@@ -72,33 +72,89 @@ class StrategieReseauManuelle(StrategieReseau):
 class StrategieReseauAuto(StrategieReseau):
     def configurer(self, t: Terrain) -> tuple[int, dict[int, tuple[int, int]], list[tuple[int, int]]]:
 
-        noeuds = {}
-        arcs = []
         entree = t.get_entree()
 
         if entree == (-1, -1):
             return -1, {}, []
 
-        # Création des noeuds du réseau
-        for i in range(t.hauteur):
-            for j in range(t.largeur):
-                n = i * t.largeur + j
-                noeuds[n] = (i, j)
+        noeuds = {0: entree}
+        arcs = []
+        positions = {entree: 0}
+        clients = set(t.get_clients())
 
-        # Création des liaisons
-        for i in range(t.hauteur):
-            for j in range(t.largeur):
-                n = i * t.largeur + j
+        # Connecter progressivement tous les clients
+        while clients - positions.keys():
 
-                # Liaison horizontale
-                if j + 1 < t.largeur:
-                    arcs.append((n, n + 1))
+            restants = clients - positions.keys()
+            distances = {}
+            precedents = {}
+            file = []
 
-                # Liaison verticale
-                if j == 0 and i + 1 < t.hauteur:
-                    arcs.append((n, n + t.largeur))
+            # Dijkstra depuis le réseau existant
+            for position in positions:
+                distances[position] = 0
+                heapq.heappush(file, (0, position))
 
-        # Identification du noeud d'entrée
-        noeud_entree = entree[0] * t.largeur + entree[1]
+            cible = None
 
-        return noeud_entree, noeuds, arcs
+            while file:
+                cout, position = heapq.heappop(file)
+
+                if cout > distances[position]:
+                    continue
+
+                if position in restants:
+                    cible = position
+                    break
+
+                i, j = position
+
+                voisins = [
+                    (i - 1, j),
+                    (i + 1, j),
+                    (i, j - 1),
+                    (i, j + 1)
+                ]
+
+                for x, y in voisins:
+                    if not (0 <= x < t.hauteur and
+                            0 <= y < t.largeur):
+                        continue
+
+                    voisin = (x, y)
+
+                    if t[x][y] == Case.OBSTACLE:
+                        nouveau_cout = cout + 3.5
+                    else:
+                        nouveau_cout = cout + 2.5
+
+                    if nouveau_cout < distances.get(voisin, float("inf")):
+                        distances[voisin] = nouveau_cout
+                        precedents[voisin] = position
+                        heapq.heappush(file, (nouveau_cout, voisin))
+
+            if cible is None:
+                return -1, {}, []
+
+            # Reconstruction du chemin
+            chemin = []
+            position = cible
+
+            while position not in positions:
+                chemin.append(position)
+                position = precedents[position]
+
+            chemin.reverse()
+
+            # Ajout du chemin au réseau
+            precedent = positions[position]
+
+            for position in chemin:
+                numero = len(noeuds)
+                noeuds[numero] = position
+                positions[position] = numero
+
+                arcs.append((precedent, numero))
+                precedent = numero
+
+        return 0, noeuds, arcs
