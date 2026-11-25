@@ -28,6 +28,9 @@ class TestReseau(unittest.TestCase):
         r.ajouter_noeud(-1, (0, 0))
         self.assertNotIn(-1, r.noeuds)
 
+        r.ajouter_noeud(1, (5, 5))
+        self.assertEqual(r.noeuds[1], (2, 3))
+
     def test_ajout_arc(self):
         r = Reseau()
 
