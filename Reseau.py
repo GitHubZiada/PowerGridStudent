@@ -17,7 +17,7 @@ class Reseau:
             self.noeud_entree = -1
 
     def ajouter_noeud(self, n: int, coords: tuple[int, int]):
-        if n >= 0:
+        if n >= 0 and n not in self.noeuds:
             self.noeuds[n] = coords
 
     def ajouter_arc(self, n1: int, n2: int) -> None:
