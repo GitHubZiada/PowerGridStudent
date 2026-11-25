@@ -7,8 +7,21 @@ from Terrain import Terrain, Case
 class TestTerrain(unittest.TestCase):
 
     def test_chargement(self):
-        # TODO
-        self.fail()
+        t = Terrain()
+
+        t.charger("terrains/t1.txt")
+
+        self.assertEqual(t.hauteur, 10)
+        self.assertEqual(t.largeur, 21)
+        self.assertEqual(len(t.get_clients()), 3)
+        self.assertNotEqual(t.get_entree(), (-1, -1))
+
+        t.charger("terrains/t2.txt")
+
+        self.assertEqual(t.hauteur, 10)
+        self.assertEqual(t.largeur, 21)
+        self.assertEqual(len(t.get_clients()), 7)
+        self.assertNotEqual(t.get_entree(), (-1, -1))
 
     def test_get_entree(self):
         t = Terrain()
